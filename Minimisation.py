@@ -14,13 +14,11 @@ cross_section_list = np.loadtxt('Theoretical_cross_sections.dat')
 cross_sections = interp1d(cross_section_list[:,0],cross_section_list[:,1])
 
 mzplist = [2100, 3100, 4100] #List of all masses, for which histograms are available
-print(cross_sections(mzplist))
 
 signal_dictionary = dict()
 
 for mzp in mzplist:
   signal_dictionary.update({mzp: np.loadtxt('mZp'+str(mzp)+'_mThighRT.txt')[0:65, 1]}) #Load histograms into dictionary
-  print(np.sum(signal_dictionary[mzp]))
  
 guesses = np.loadtxt('GuessList.dat') #List of 71 initial guesses for function minimisation. Designed to ensure good convergence to global minimum
 best_p_bg = np.array([-31.66421994, 29.07483373, -24.88109709, -3.68618232])
