@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.special import xlogy
-from scipy.optimize import minimize, root
+from scipy.optimize import minimize, root, brentq
 from scipy.interpolate import interp1d
 import time
 
@@ -18,8 +18,8 @@ mzplist = [2100, 3100, 4100] #List of all masses, for which histograms are avail
 signal_dictionary = dict()
 
 for mzp in mzplist:
-  signal_dictionary.update({mzp: np.loadtxt('mZp'+str(mzp)+'_mThighRT.txt')[0:65, 1]}) #Load histograms into dictionary
- 
+  signal_dictionary.update({mzp: np.loadtxt('mZp'+str(mzp)+'_100k_mThighRT.txt')[0:65, 1]}) #Load histograms into dictionary
+  
 guesses = np.loadtxt('GuessList.dat') #List of 71 initial guesses for function minimisation. Designed to ensure good convergence to global minimum
 best_p_bg = np.array([-31.66421994, 29.07483373, -24.88109709, -3.68618232])
 
@@ -63,18 +63,21 @@ def signal_strength_bound(signal, fix_params = False):
   
     def test_statistic(mu):
       result = best_log_likelihood(signal = mu * signal) - background_log_likelihood - 3.84
-      if verbose > 0: print(mu, result)
+      if verbose > 0: print('Trying signal strengh mu =',mu,'with result =',result)
       return result
 
   else:
   
     def test_statistic(mu):
       result = log_likelihood(best_p_bg, mu * signal) - background_log_likelihood - 3.84
-      if verbose > 0: print(mu, result)
+      if verbose > 0: print('Trying signal strengh mu =',mu,'with result =',result)
       return result
-    
-  res = root(test_statistic, [1], tol = 0.01)
-  return res.x[0]
+  
+  initial_guess = 1
+  while test_statistic(initial_guess) < 1: initial_guess *= 2
+  
+  res = brentq(test_statistic, 0, initial_guess, xtol = 0.01)
+  return res
 
 for mzp in mzplist:
   mubound = signal_strength_bound(signal_dictionary[mzp])
