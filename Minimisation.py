@@ -17,14 +17,16 @@ events5b = data5b[:,1]
 cross_section_list = np.loadtxt('Theoretical_cross_sections.dat')
 cross_sections = interp1d(cross_section_list[:,0],cross_section_list[:,1])
 
-mzplist = [2100, 3100, 4100] #List of all masses, for which histograms are available
+mzplist = np.arange(1500,5300,step=200) #List of all masses, for which histograms are available
 
 signal_dictionary_high = dict()
 signal_dictionary_low = dict()
 
+luminosity = 1.38e5
+
 for mzp in mzplist:
-  signal_dictionary_high.update({mzp: np.loadtxt('mZp'+str(mzp)+'_100k_mThighRT.txt')[0:65, 1]}) #Load histograms into dictionary
-  signal_dictionary_low.update({mzp: np.loadtxt('mZp'+str(mzp)+'_100k_mTlowRT.txt')[0:65, 1]}) #Load histograms into dictionary
+  signal_dictionary_high.update({mzp: np.loadtxt('Data/3_mZp'+str(mzp)+'_mThighRT.txt')[0:65, 1]*cross_sections(mzp)*luminosity}) #Load histograms into dictionary
+  signal_dictionary_low.update({mzp: np.loadtxt('Data/3_mZp'+str(mzp)+'_mTlowRT.txt')[0:65, 1]*cross_sections(mzp)*luminosity}) #Load histograms into dictionary
   
 guesses5a = np.loadtxt('GuessList_5a.dat') #List of 71 initial guesses for function minimisation. Designed to ensure good convergence to global minimum
 guesses5b = np.loadtxt('GuessList_5b.dat') #List of 70 initial guesses for function minimisation. Designed to ensure good convergence to global minimum
@@ -111,22 +113,27 @@ def signal_strength_bound(signal_high, signal_low, fix_params = False):
     
     def chi2(mu):
       result = best_log_likelihood_5a(signal = mu * signal_high) + best_log_likelihood_5b(signal = mu * signal_low)
+      if verbose > 0: print('Trying signal strengh mu =',mu,'with chi2 =',result)      
       return result
           
   else:
   
     def chi2(mu):
       result = log_likelihood_5a(best_p_bg_5a, mu * signal_high, False) + log_likelihood_5b(best_p_bg_5b, mu * signal_low, False)
+      if verbose > 0: print('Trying signal strengh mu =',mu,'with chi2 =',result)
       return result
 
-  initial_guess = 1
+  initial_guess = 0.2
 
   cons = ({'type': 'ineq', 'fun': lambda x:  x})
 
   res = minimize(chi2, initial_guess, constraints=cons, tol=0.1)
+
+  if verbose > 0: print(res)
  
   def test_statistic(mu):
       result = chi2(mu) - res.fun - 3.84
+      if verbose > 0: print('Trying signal strengh mu =',mu,'with result =',result)
       return result
       
   while test_statistic(initial_guess) < 0: initial_guess *= 2  
@@ -140,16 +147,23 @@ def signal_strength_bound(signal_high, signal_low, fix_params = False):
         
     result = 0.05 - (1 - norm.cdf(sqrt_safe(delta_chi2)))/norm.cdf(sqrt_safe(chi2_Asimov) - sqrt_safe(delta_chi2))
         
-    if verbose > 0: print('Trying signal strengh mu =',mu,'with result =',result)
+    if verbose > 0: print('Trying signal strengh mu =',mu,'with CLs =',result)
     return result
+
+  while CLs(initial_guess) < 0: initial_guess *= 2  
 
   res3 = brentq(CLs, 0, initial_guess, xtol = 0.01)
   
   return res2, res3
 
+resultlist = []
 for mzp in mzplist:
   mubound, mubound_CLs = signal_strength_bound(signal_dictionary_high[mzp], signal_dictionary_low[mzp])
-  mubound_fixed, mubound_fixed_CLs = signal_strength_bound(signal_dictionary_high[mzp], signal_dictionary_low[mzp], fix_params = True)
-  print('Bound on signal strength for M_Zp =',mzp,'GeV: ',mubound_CLs, '(', mubound_fixed, 'without background variation and without CLs)')
+#  mubound_fixed, mubound_fixed_CLs = signal_strength_bound(signal_dictionary_high[mzp], signal_dictionary_low[mzp], fix_params = True)
+  print('Bound on signal strength for M_Zp =',mzp,'GeV: ',mubound_CLs)#, '(', mubound_fixed, 'without background variation and without CLs)')
   print('Bound on cross section for M_Zp =',mzp,'GeV: ',mubound_CLs*cross_sections(mzp),'pb')
+  resultlist.append([mzp, mubound_CLs*cross_sections(mzp)])
+
+np.savetxt('cross_section_bound.dat',resultlist)
+
 
